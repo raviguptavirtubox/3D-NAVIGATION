@@ -3,30 +3,44 @@
   <head>
     <title>360 Walkthrough</title>
     <script src="https://aframe.io/releases/1.4.0/aframe.min.js"></script>
+    <style>
+      #overlay {
+        position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+        background: rgba(0,0,0,0.9); z-index: 9999;
+        display: flex; justify-content: center; align-items: center;
+      }
+      button { padding: 20px 40px; font-size: 20px; cursor: pointer; background: #2196F3; color: white; border: none; border-radius: 5px; }
+    </style>
   </head>
   <body>
-    <a-scene cursor="rayOrigin: mouse">
-      
+
+    <div id="overlay">
+      <button onclick="startScene()">START VIRTUAL TOUR</button>
+    </div>
+
+    <a-scene id="scene" style="display: none;" cursor="rayOrigin: mouse">
       <a-assets>
         <img id="img-start" src="start.jpg">
         <img id="img-middle" src="middle.jpg">
         <img id="img-end" src="end.jpg">
-        <img id="arrow-texture" src="https://img.icons8.com/m_sharp/200/FFFFFF/up.png">
+        <img id="arrow" src="https://img.icons8.com/m_sharp/200/FFFFFF/up.png">
       </a-assets>
 
       <a-sky id="main-sky" src="#img-start" rotation="0 -90 0"></a-sky>
 
-      <a-image id="arrow-to-middle" src="#arrow-texture" 
-               position="0 -1.5 -3" rotation="-90 0 0" scale="1 1 1"
-               visible="true" class="clickable"
-               onclick="moveRoom('middle')">
-      </a-image>
+      <a-text id="status-text" value="You are here" align="center" position="0 2 -4" color="#FFF" width="6"></a-text>
 
-      <a-image id="arrow-to-end" src="#arrow-texture" 
-               position="0 -1.5 -3" rotation="-90 0 0" scale="1 1 1"
-               visible="false" class="clickable"
-               onclick="moveRoom('end')">
-      </a-image>
+      <a-entity id="group-to-middle">
+        <a-image src="#arrow" position="0 -1.5 -3" rotation="-90 0 0" class="clickable" onclick="moveRoom('middle')"></a-image>
+        <a-text value="Go to Middle" align="center" position="0 -0.8 -3" scale="0.8 0.8 0.8"></a-text>
+      </a-entity>
+
+      <a-entity id="group-to-end" visible="false">
+        <a-image src="#arrow" position="0 -1.5 -3" rotation="-90 0 0" class="clickable" onclick="moveRoom('end')"></a-image>
+        <a-text value="Go to End" align="center" position="0 -0.8 -3" scale="0.8 0.8 0.8"></a-text>
+      </a-entity>
+
+      <a-text id="dest-text" value="DESTINATION REACHED" align="center" position="0 1.5 -3" color="#4CAF50" width="8" visible="false"></a-text>
 
       <a-entity camera look-controls>
         <a-cursor fuse="true" fuse-timeout="1500" color="yellow"></a-cursor>
@@ -34,19 +48,33 @@
     </a-scene>
 
     <script>
+      function startScene() {
+        document.getElementById('overlay').style.display = 'none';
+        document.getElementById('scene').style.display = 'block';
+        if (typeof DeviceOrientationEvent.requestPermission === 'function') {
+          DeviceOrientationEvent.requestPermission();
+        }
+      }
+
       function moveRoom(roomName) {
         const sky = document.querySelector('#main-sky');
-        const arrow1 = document.querySelector('#arrow-to-middle');
-        const arrow2 = document.querySelector('#arrow-to-end');
+        const statusText = document.querySelector('#status-text');
+        const toMiddle = document.querySelector('#group-to-middle');
+        const toEnd = document.querySelector('#group-to-end');
+        const destText = document.querySelector('#dest-text');
 
         if (roomName === 'middle') {
           sky.setAttribute('src', '#img-middle');
-          arrow1.setAttribute('visible', 'false');
-          arrow2.setAttribute('visible', 'true');
+          statusText.setAttribute('value', 'Middle Point');
+          toMiddle.setAttribute('visible', 'false');
+          toMiddle.setAttribute('class', 'not-clickable'); // Remove clickability
+          toEnd.setAttribute('visible', 'true');
         } 
         else if (roomName === 'end') {
           sky.setAttribute('src', '#img-end');
-          arrow2.setAttribute('visible', 'false');
+          statusText.setAttribute('visible', 'false');
+          toEnd.setAttribute('visible', 'false');
+          destText.setAttribute('visible', 'true');
         }
       }
     </script>
