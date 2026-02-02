@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>360 Walkthrough</title>
+    <script src="https://aframe.io/releases/1.4.0/aframe.min.js"></script>
+  </head>
+  <body>
+    <a-scene>
+      <a-assets>
+        <img id="img-start" src="./start.jpg">
+        <img id="img-middle" src="./middle.jpg">
+        <img id="img-end" src="./end.jpg">
+        <img id="arrow-texture" src="https://cdn-icons-png.flaticon.com/512/54/54321.png">
+      </a-assets>
+
+      <a-sky id="main-sky" src="#img-start" rotation="0 -90 0"></a-sky>
+
+      <a-image id="arrow-to-middle" src="#arrow-texture" 
+               position="0 -1.5 -5" rotation="90 0 0" scale="1 1 1"
+               visible="true" class="clickable"
+               onclick="moveRoom('middle')">
+      </a-image>
+
+      <a-image id="arrow-to-end" src="#arrow-texture" 
+               position="5 -1.5 0" rotation="90 90 0" scale="1 1 1"
+               visible="false" class="clickable"
+               onclick="moveRoom('end')">
+      </a-image>
+
+      <a-entity camera look-controls>
+        <a-cursor fuse="true" fuse-timeout="1500" color="yellow"></a-cursor>
+      </a-entity>
+    </a-scene>
+
+    <script>
+      function moveRoom(roomName) {
+        const sky = document.querySelector('#main-sky');
+        const arrow1 = document.querySelector('#arrow-to-middle');
+        const arrow2 = document.querySelector('#arrow-to-end');
+
+        if (roomName === 'middle') {
+          sky.setAttribute('src', '#img-middle');
+          arrow1.setAttribute('visible', 'false'); // Hide the first arrow
+          arrow2.setAttribute('visible', 'true');  // Show the next arrow
+        } 
+        else if (roomName === 'end') {
+          sky.setAttribute('src', '#img-end');
+          arrow2.setAttribute('visible', 'false'); // Hide all arrows at the end
+        }
+      }
+    </script>
+  </body>
+</html>
