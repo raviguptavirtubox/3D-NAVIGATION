@@ -7,18 +7,21 @@
       #overlay {
         position: fixed; top: 0; left: 0; width: 100%; height: 100%;
         background: rgba(0,0,0,0.9); z-index: 9999;
-        display: flex; justify-content: center; align-items: center;
+        display: flex; flex-direction: column; justify-content: center; align-items: center; color: white;
       }
-      button { padding: 20px 40px; font-size: 20px; cursor: pointer; background: #2196F3; color: white; border: none; border-radius: 5px; }
+      button { padding: 20px 40px; font-size: 20px; cursor: pointer; background: #4CAF50; color: white; border: none; border-radius: 5px; }
     </style>
   </head>
   <body>
 
     <div id="overlay">
-      <button onclick="startScene()">START VIRTUAL TOUR</button>
+      <h1>360 Tour</h1>
+      <p>Look around to find the navigation arrows</p>
+      <button onclick="startScene()">ENTER TOUR</button>
     </div>
 
-    <a-scene id="scene" style="display: none;" cursor="rayOrigin: mouse">
+    <a-scene id="scene" style="display: none;" cursor="rayOrigin: mouse" raycaster="objects: .clickable">
+      
       <a-assets>
         <img id="img-start" src="start.jpg">
         <img id="img-middle" src="middle.jpg">
@@ -28,22 +31,21 @@
 
       <a-sky id="main-sky" src="#img-start" rotation="0 -90 0"></a-sky>
 
-      <a-text id="status-text" value="You are here" align="center" position="0 2 -4" color="#FFF" width="6"></a-text>
+      <a-text id="status-text" value="You are here: Start" align="center" position="0 2 -3" width="6"></a-text>
 
-      <a-entity id="group-to-middle">
-        <a-image src="#arrow" position="0 -1.5 -3" rotation="-90 0 0" class="clickable" onclick="moveRoom('middle')"></a-image>
-        <a-text value="Go to Middle" align="center" position="0 -0.8 -3" scale="0.8 0.8 0.8"></a-text>
+      <a-entity id="nav-group">
+        
+        <a-entity id="arrow-middle-container" position="0 -1.5 -4">
+            <a-image src="#arrow" rotation="-90 0 0" class="clickable" onclick="moveRoom('middle')"></a-image>
+            <a-text value="GO TO MIDDLE" align="center" position="0 0.5 0" scale="1.5 1.5 1.5"></a-text>
+        </a-entity>
+
       </a-entity>
 
-      <a-entity id="group-to-end" visible="false">
-        <a-image src="#arrow" position="0 -1.5 -3" rotation="-90 0 0" class="clickable" onclick="moveRoom('end')"></a-image>
-        <a-text value="Go to End" align="center" position="0 -0.8 -3" scale="0.8 0.8 0.8"></a-text>
-      </a-entity>
-
-      <a-text id="dest-text" value="DESTINATION REACHED" align="center" position="0 1.5 -3" color="#4CAF50" width="8" visible="false"></a-text>
+      <a-text id="dest-text" value="DESTINATION REACHED" align="center" position="0 1.5 -3" color="#4CAF50" width="10" visible="false"></a-text>
 
       <a-entity camera look-controls>
-        <a-cursor fuse="true" fuse-timeout="1500" color="yellow"></a-cursor>
+        <a-cursor color="yellow" raycaster="objects: .clickable"></a-cursor>
       </a-entity>
     </a-scene>
 
@@ -51,29 +53,37 @@
       function startScene() {
         document.getElementById('overlay').style.display = 'none';
         document.getElementById('scene').style.display = 'block';
-        if (typeof DeviceOrientationEvent.requestPermission === 'function') {
-          DeviceOrientationEvent.requestPermission();
-        }
+        // Force refresh for A-Frame to render the images
+        document.querySelector('a-scene').resize();
       }
 
       function moveRoom(roomName) {
         const sky = document.querySelector('#main-sky');
         const statusText = document.querySelector('#status-text');
-        const toMiddle = document.querySelector('#group-to-middle');
-        const toEnd = document.querySelector('#group-to-end');
+        const middleArrow = document.querySelector('#arrow-middle-container');
         const destText = document.querySelector('#dest-text');
 
         if (roomName === 'middle') {
+          // Change to Middle Image
           sky.setAttribute('src', '#img-middle');
-          statusText.setAttribute('value', 'Middle Point');
-          toMiddle.setAttribute('visible', 'false');
-          toMiddle.setAttribute('class', 'not-clickable'); // Remove clickability
-          toEnd.setAttribute('visible', 'true');
+          statusText.setAttribute('value', 'You are here: Middle');
+          
+          // Update the arrow to point to the END image instead
+          // We change the onclick function to 'end'
+          const arrowImg = middleArrow.querySelector('a-image');
+          const arrowText = middleArrow.querySelector('a-text');
+          
+          arrowText.setAttribute('value', 'GO TO END');
+          arrowImg.setAttribute('onclick', "moveRoom('end')");
+          
+          // Move the arrow position if the door is in a different spot in the middle room
+          middleArrow.setAttribute('position', '2 -1.5 -3'); 
         } 
         else if (roomName === 'end') {
+          // Change to End Image
           sky.setAttribute('src', '#img-end');
+          middleArrow.setAttribute('visible', 'false');
           statusText.setAttribute('visible', 'false');
-          toEnd.setAttribute('visible', 'false');
           destText.setAttribute('visible', 'true');
         }
       }
