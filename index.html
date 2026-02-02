@@ -3,149 +3,98 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Live AR Hospital Navigation</title>
-    
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/pannellum@2.5.6/build/pannellum.css"/>
-    <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/pannellum@2.5.6/build/pannellum.js"></script>
-
+    <title>Live AR Navigation</title>
+    <script src="https://cdn.jsdelivr.net/npm/pannellum@2.5.6/build/pannellum.js"></script>
     <style>
-        body, html { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: #000; font-family: sans-serif; }
+        body, html { margin: 0; padding: 0; height: 100%; overflow: hidden; background: #000; font-family: sans-serif; }
         
-        /* The Live Camera Feed */
-        #video-bg {
-            position: fixed; right: 0; bottom: 0;
-            min-width: 100%; min-height: 100%;
-            z-index: 1; filter: brightness(0.7);
+        #camera-feed { position: fixed; top: 0; left: 0; min-width: 100%; min-height: 100%; z-index: 1; object-fit: cover; }
+
+        /* The 360 Reference Window (The 'SLAM' anchor) */
+        #pano-ref { 
+            position: fixed; top: 20px; right: 20px; width: 140px; height: 140px; 
+            border: 2px solid #fff; border-radius: 50%; z-index: 10; overflow: hidden;
         }
 
-        /* The 360 Overlay (Visual SLAM Reference) */
-        #panorama {
-            position: fixed; top: 10px; right: 10px;
-            width: 120px; height: 120px;
-            border-radius: 50%; border: 3px solid #fff;
-            z-index: 10; opacity: 0.9; pointer-events: none;
+        /* Large AR Navigation Arrow */
+        #ar-arrow-container {
+            position: fixed; top: 45%; left: 50%; transform: translate(-50%, -50%);
+            z-index: 5; pointer-events: none;
+        }
+        #arrow { 
+            font-size: 150px; color: #00ffcc; text-shadow: 0 0 30px rgba(0,0,0,0.5);
+            transition: transform 0.1s linear; 
         }
 
-        /* Navigation Instructions */
-        #ui-layer {
-            position: absolute; bottom: 30px; left: 0; right: 0;
-            z-index: 20; display: flex; flex-direction: column; align-items: center;
+        #ui-panel {
+            position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%);
+            width: 80%; background: rgba(255,255,255,0.95); padding: 20px;
+            border-radius: 20px; z-index: 100; text-align: center; box-shadow: 0 5px 20px rgba(0,0,0,0.3);
         }
-
-        .instruction-card {
-            background: rgba(255, 255, 255, 0.9);
-            padding: 20px; border-radius: 20px; width: 80%;
-            text-align: center; box-shadow: 0 10px 30px rgba(0,0,0,0.3);
-        }
-
-        .ar-arrow {
-            font-size: 80px; color: #007AFF;
-            text-shadow: 0 0 20px rgba(255,255,255,0.8);
-            margin-bottom: 10px; transition: transform 0.3s ease;
-        }
+        button { background: #007AFF; color: white; border: none; padding: 12px 25px; border-radius: 10px; font-weight: bold; }
     </style>
 </head>
 <body>
 
-    <video id="video-bg" autoplay playsinline></video>
+    <video id="camera-feed" autoplay playsinline></video>
+    <div id="pano-ref"></div>
+    
+    <div id="ar-arrow-container">
+        <div id="arrow">↑</div>
+    </div>
 
-    <div id="panorama"></div>
-
-    <div id="ui-layer">
-        <div class="ar-arrow" id="main-arrow">↑</div>
-        <div class="instruction-card">
-            <h2 id="step-title">Following Route...</h2>
-            <p id="step-desc">Point your phone down the hallway to begin.</p>
-        </div>
+    <div id="ui-panel">
+        <h2 id="step-title">Starting at Kiosk A</h2>
+        <p id="instruction">Looking for path...</p>
+        <button id="next-btn">I am at the Middle Point</button>
     </div>
 
 <script>
-    // --- DATA CONFIGURATION ---
-    const navData = {
-        "Kiosk_A": {
-            pano: "https://static.virtubox.io/catalog/file/20260202-090353-wnku-start.jpg", // Replace with your 360 img link
-            instruction: "Walk toward the Pharmacy",
-            rotation: 0, 
-            next: "Hallway_1"
-        },
-        "Hallway_1": {
-            pano: "https://static.virtubox.io/catalog/file/20260202-090351-mi0w-middle.jpg",
-            instruction: "Turn Left at the elevators",
-            rotation: -90,
-            next: "Cardiology"
-        },
+    // 1. CONFIGURATION: Define your physical hallway layout
+    // arrowAngle: 0 = straight, 90 = right, 180 = back, 270 = left
+   // --- 1. THE NAVIGATION DATA ---
+const routeData = [
+    { id: "Kiosk_A", name: "Main Entrance", pano: "https://static.virtubox.io/catalog/file/20260202-090353-wnku-start.jpg", arrowAngle: 90, instruction: "Turn right and head to the Middle Hall" },
+    { id: "Middle", name: "Middle Junction", pano: "https://static.virtubox.io/catalog/file/20260202-090351-mi0w-middle.jpg", arrowAngle: 0, instruction: "Continue straight to Kiosk B" },
+    { id: "Kiosk_B", name: "Pharmacy Lobby", pano: "https://static.virtubox.io/catalog/file/20260202-090348-vx8f-end.jpg", arrowAngle: 0, instruction: "You have arrived!" }
+];
 
-        "Kiosk_B": {
-            pano: "https://static.virtubox.io/catalog/file/20260202-090348-vx8f-end.jpg",
-            instruction: "Turn Left at the elevators",
-            rotation: -90,
-            next: "Cardiology"
-        }
-    };
+// --- 2. DYNAMIC START/END DETECTION ---
+const params = new URLSearchParams(window.location.search);
+const startID = params.get('from'); // Comes from QR: "Kiosk_A"
+const endID = params.get('to');     // Comes from QR: "Kiosk_B"
 
-    // --- STEP 1: START LIVE CAMERA ---
-    async function startCamera() {
-        const video = document.getElementById('video-bg');
-        try {
-            const stream = await navigator.mediaDevices.getUserMedia({ 
-                video: { facingMode: "environment" }, 
-                audio: false 
-            });
-            video.srcObject = stream;
-        } catch (err) {
-            console.error("Camera error: ", err);
-            alert("Please allow camera access for AR navigation.");
-        }
-    }
+// Find the index in our array that matches the "from" parameter
+let currentStep = routeData.findIndex(step => step.id === startID);
 
-    // --- STEP 2: INITIALIZE 360 OVERLAY ---
-    const params = new URLSearchParams(window.location.search);
-    const startNode = params.get('from') || "Kiosk_A";
-    
-    const viewer = pannellum.viewer('panorama', {
+// Fallback if URL is broken
+if (currentStep === -1) currentStep = 0; 
+
+function updateWayfinding() {
+    const step = routeData[currentStep];
+    const destination = routeData.find(s => s.id === endID) || routeData[routeData.length - 1];
+
+    document.getElementById('step-title').innerText = `From: ${step.name}`;
+    document.getElementById('instruction').innerText = `${step.instruction} to reach ${destination.name}`;
+
+    // Update the 360 viewer (Visual SLAM Reference)
+    pannellum.viewer('pano-ref', {
         "type": "equirectangular",
-        "panorama": navData[startNode].pano,
+        "panorama": step.pano,
         "autoLoad": true,
         "showControls": false
     });
 
-    // --- STEP 3: SENSOR LOGIC (Simulated SLAM) ---
-    // This rotates the arrow based on the phone's physical orientation
-    function handleOrientation(event) {
-        if (event.alpha !== null) {
-            const compass = event.alpha; // Compass heading
-            const arrow = document.getElementById('main-arrow');
-            
-            // Adjust the arrow based on the destination rotation
-            const targetRotation = navData[startNode].rotation;
-            arrow.style.transform = `rotate(${compass + targetRotation}deg)`;
-        }
+    // If we've reached the 'to' destination, change the button
+    const btn = document.getElementById('next-btn');
+    if (step.id === endID) {
+        btn.innerText = "Arrived";
+        btn.style.background = "#28a745";
+        document.getElementById('arrow').innerHTML = "Check"; // Change arrow to checkmark
+    } else {
+        btn.innerText = "Next Checkpoint";
     }
-
-    // --- STEP 4: UI UPDATES ---
-    function initNav() {
-        const node = navData[startNode];
-        document.getElementById('step-title').innerText = "Target: " + params.get('to');
-        document.getElementById('step-desc').innerText = node.instruction;
-        
-        // Request Permission for Orientation (Required for iOS)
-        if (typeof DeviceOrientationEvent.requestPermission === 'function') {
-            DeviceOrientationEvent.requestPermission()
-                .then(state => {
-                    if (state === 'granted') {
-                        window.addEventListener('deviceorientation', handleOrientation);
-                    }
-                });
-        } else {
-            window.addEventListener('deviceorientation', handleOrientation);
-        }
-    }
-
-    // Initialize everything
-    window.onload = () => {
-        startCamera();
-        initNav();
-    };
+}
 </script>
 </body>
 </html>
